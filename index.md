@@ -9,13 +9,17 @@ title: "IoT Link | Wireless communication for embedded devices powered by bitBoa
 <i>Controlling embedded devices wirelessly using ESP32-C3 WROOM</i>
 
 This repository presents a practical introduction to implementing ESP-NOW communication between two ESP32 microcontrollers, one configured as a transmitter and the other as a receiver. The transmitter collects control data—such as joystick positions and motor PWM values—and sends it using a structured format and FreeRTOS tasks to manage concurrent operations. The sendData() function handles data preparation and transmission, while a callback monitors delivery status and manages errors.
+
 On the receiver side, the focus is on registering the transmitter’s MAC address and using the onDataReceived() callback to process incoming data. The post emphasizes the importance of consistent configuration between devices, including shared data structures, Wi-Fi channel settings, and peer registration. This ensures reliable, low-latency communication without the need for a traditional Wi-Fi network, making ESP-NOW a suitable protocol for remote control applications using ESP32.
 
 # COMMON CODE BLOCKS FIRST
 
 ESP-NOW is a wireless protocol that allows devices to exchange data directly without needing a Wi-Fi network. For this to work reliably, both devices must be programmed in a similar fashion.
+
 For example, the code defining and handling the data must be consistent to ensure proper data transmission and reception. This means that the data structs sent between devices must be identical, as well as the initialization of ESP-NOW protocol.
-Defining Data Struct
+
+## Defining Data Struct
+
 The following struct defines the format and organization of the data being transmitted from the sender to the receiver in an ESP-NOW communication setup. Each field represents a specific sensor reading or control signal that the receiving device will interpret and act upon accordingly.
 
 ``` C
@@ -35,6 +39,7 @@ typedef struct {
 ## Getting ESP-NOW Ready
 
 The part of code responsible for initializing ESP-NOW is the same both the systems. The app_main() in both transmitter and receiver devices must begin by initializing the Non-Volatile Storage (NVS) required for Wi-Fi and ESP-NOW operations. After that, calling wifi_init() sets the devices to Wi-Fi station mode necessary for ESP-NOW communication.
+
 This function is essential for both transmitter and receiver devices, as ESP-NOW must be initialized before sending or receiving any data.
 
 ``` C
@@ -67,13 +72,15 @@ void wifi_init()
 }
 ```
 
+# MOVING ON TO TRANSMITTER & RECEIVER DEVICES
 
-MOVING ON TO TRANSMITTER & RECEIVER DEVICES
-Transmitter
-On the transmitter device, the code is organized around two main functions: transmission and verification. The transmission function transmission_init() is called from the app_main() function for sending the data to the receiver using ESP-NOW. The verification function ensures that the data has been sent successfully by checking the transmission status using the call-back function. Since the ESP32-C3 microcontroller may be handling multiple tasks simultaneously, the code uses FreeRTOS tasks to allow different operations to run concurrently. This multitasking approach helps maintain responsiveness and efficiency, especially when managing communication alongside other system functions.<p><b><strong style="white-space: pre-wrap;">Don’t miss out!</strong></b><br><span style="white-space: pre-wrap;">Subscribe to our mailing list and be the first to get updates, tutorials, and insights delivered straight to your inbox. Stay ahead with the latest posts and projects—join our community today! 🚀</span></p>
+## Transmitter
 
+On the transmitter device, the code is organized around two main functions: transmission and verification. The transmission function transmission_init() is called from the app_main() function for sending the data to the receiver using ESP-NOW. The verification function ensures that the data has been sent successfully by checking the transmission status using the call-back function. Since the ESP32-C3 microcontroller may be handling multiple tasks simultaneously, the code uses FreeRTOS tasks to allow different operations to run concurrently. This multitasking approach helps maintain responsiveness and efficiency, especially when managing communication alongside other system functions.
 
-The code block below outlines the function responsible for initializing the ESP-NOW protocol on the transmitter device. Specifically, the transmission_init() function begins by calling esp_now_init() to activate the ESP-NOW feature. If initialization is successful, the program proceeds to register a callback function, statusDataSend, which is triggered after each transmission to verify whether the data was sent correctly. A key part of this setup involves specifying the receiving device using its MAC address, along with other configuration parameters such as the communication channel and encryption settings. These details are then registered using esp_now_add_peer(). Finally, a FreeRTOS task named rc_send_data_task is created to manage the periodic transmission of remote control data. This structured approach ensures that the transmitter is properly configured for reliable communication with the receiver using ESP-NOW.``` c
+The code block below outlines the function responsible for initializing the ESP-NOW protocol on the transmitter device. Specifically, the transmission_init() function begins by calling esp_now_init() to activate the ESP-NOW feature. If initialization is successful, the program proceeds to register a callback function, statusDataSend, which is triggered after each transmission to verify whether the data was sent correctly. A key part of this setup involves specifying the receiving device using its MAC address, along with other configuration parameters such as the communication channel and encryption settings. These details are then registered using esp_now_add_peer(). Finally, a FreeRTOS task named rc_send_data_task is created to manage the periodic transmission of remote control data. This structured approach ensures that the transmitter is properly configured for reliable communication with the receiver using ESP-NOW.
+
+``` c
 void transmission_init()
 {
     esp_err_t espnow_ret = esp_now_init();
@@ -95,8 +102,9 @@ void transmission_init()
 }
 ```
 
+The FreeRTOS task for executing the function for sending the data every 100 ms is as follows:
 
-The FreeRTOS task for executing the function for sending the data every 100 ms is as follows:``` c
+``` c
 // Task to periodically send ESPNOW remote control data
 static void rc_send_data_task()
 {
@@ -109,9 +117,11 @@ static void rc_send_data_task()
 }
 ```
 
-
 Finally, shown below is the sendData() function responsible for preparing and transmitting a structured set of control data from the transmitter device to the receiver using the ESP-NOW protocol. It begins by updating the fields of a data buffer, including joystick coordinates, button states, LED status, and PWM values for four motors. Note that the composition of variables corresponds to the data struct defined earlier.
-Before sending the data, the function retrieves and logs the current Wi-Fi channel to ensure the device is operating on the correct frequency. It then calls esp_now_send(), passing the receiver’s MAC address, a pointer to the data buffer, and the size of the data. If the transmission fails, the function logs detailed error messages, including the error code and the receiver’s MAC address, and calls deletePeer() to remove the peer configuration. This function plays a central role in the communication process, ensuring that the transmitter sends the data to the receiver while providing feedback in case of transmission issues.``` c
+
+Before sending the data, the function retrieves and logs the current Wi-Fi channel to ensure the device is operating on the correct frequency. It then calls esp_now_send(), passing the receiver’s MAC address, a pointer to the data buffer, and the size of the data. If the transmission fails, the function logs detailed error messages, including the error code and the receiver’s MAC address, and calls deletePeer() to remove the peer configuration. This function plays a central role in the communication process, ensuring that the transmitter sends the data to the receiver while providing feedback in case of transmission issues.
+
+``` c
 static void sendData (void)
 {
     buffer.crc = 0;
@@ -155,7 +165,9 @@ static void sendData (void)
 ```
 
 
-Lastly, the statusDataSend() function serves as a callback that is automatically triggered after each ESP-NOW data transmission. Its primary role is to check whether the data was sent successfully and to provide feedback based on the result. If the transmission is successful, the function logs a confirmation message along with the MAC address of the receiving device. However, in the event of a failure, the function also removes the peer configuration using deletePeer() and restarts the device with esp_restart() to attempt another transmission session. This callback is essential for monitoring the reliability of communication.``` c
+Lastly, the statusDataSend() function serves as a callback that is automatically triggered after each ESP-NOW data transmission. Its primary role is to check whether the data was sent successfully and to provide feedback based on the result. If the transmission is successful, the function logs a confirmation message along with the MAC address of the receiving device. However, in the event of a failure, the function also removes the peer configuration using deletePeer() and restarts the device with esp_restart() to attempt another transmission session. This callback is essential for monitoring the reliability of communication.
+
+``` c
 // Callback function to handle the status of data transmission
 // This function is called when the data is sent or if there is an error.
 static void statusDataSend(const uint8_t *mac_addr, esp_now_send_status_t status)
@@ -178,8 +190,11 @@ static void statusDataSend(const uint8_t *mac_addr, esp_now_send_status_t status
 ```
 
 
-Receiver
-On the receiver device, the code is slightly simpler, as its primary role is to receive and process incoming data. Within the app_main() function, the transmitter device is registered by specifying its MAC address and communication parameters using the esp_now_peer_info_t structure. This includes setting the Wi-Fi interface, communication channel, and encryption settings. Once the peer information is configured, it is added to the ESP-NOW peer list using esp_now_add_peer(). Importantly, a callback function named onDataReceived is registered using esp_now_register_recv_cb(). This function is automatically triggered whenever data is received, allowing the program to store the incoming information into a predefined data structure. This setup ensures that the receiver is properly configured to recognize the transmitter and handle incoming ESP-NOW messages efficiently.``` c
+## Receiver
+
+On the receiver device, the code is slightly simpler, as its primary role is to receive and process incoming data. Within the app_main() function, the transmitter device is registered by specifying its MAC address and communication parameters using the esp_now_peer_info_t structure. This includes setting the Wi-Fi interface, communication channel, and encryption settings. Once the peer information is configured, it is added to the ESP-NOW peer list using esp_now_add_peer(). Importantly, a callback function named onDataReceived is registered using esp_now_register_recv_cb(). This function is automatically triggered whenever data is received, allowing the program to store the incoming information into a predefined data structure. This setup ensures that the receiver is properly configured to recognize the transmitter and handle incoming ESP-NOW messages efficiently.
+
+``` c
 esp_now_peer_info_t transmitterInfo = {0};
 memcpy(transmitterInfo.peer_addr, transmitter_mac, ESP_NOW_ETH_ALEN);
 transmitterInfo.channel = 0; // Current WiFi channel
@@ -191,7 +206,9 @@ ESP_ERROR_CHECK(esp_now_register_recv_cb((void*)onDataReceived));
 ```
 
 
-The onDataReceived() function is designed to handle incoming data on the receiver device in an ESP-NOW communication setup. When data is received, this callback function is automatically triggered. It begins by logging the MAC address of the transmitting device and the length of the received data, which helps verify the source and size of the transmission. The actual data is then copied into a predefined buffer using memcpy(), allowing the receiver to store and later process the information in a structured format. This function plays a key role in ensuring that incoming data is captured accurately and efficiently for further use within the application.``` c
+The onDataReceived() function is designed to handle incoming data on the receiver device in an ESP-NOW communication setup. When data is received, this callback function is automatically triggered. It begins by logging the MAC address of the transmitting device and the length of the received data, which helps verify the source and size of the transmission. The actual data is then copied into a predefined buffer using memcpy(), allowing the receiver to store and later process the information in a structured format. This function plays a key role in ensuring that incoming data is captured accurately and efficiently for further use within the application.
+
+``` c
 void onDataReceived (const uint8_t *mac_addr, const uint8_t *data, uint8_t data_len) {
 
     ESP_LOGI(TAG, "Data received from: %02x:%02x:%02x:%02x:%02x:%02x, len=%d", mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5], data_len);
@@ -201,12 +218,12 @@ void onDataReceived (const uint8_t *mac_addr, const uint8_t *data, uint8_t data_
 ```
 
 
-CONCLUSION
-In conclusion, establishing ESP-NOW communication between two ESP32 devices requires a consistent and well-structured approach. Both the transmitter and receiver must share identical data structures and initialization routines, including the setup of NVS and Wi-Fi in station mode. On the transmitter side, FreeRTOS tasks manage data preparation and transmission, while callback functions monitor success and handle errors. The receiver, in contrast, focuses on registering the transmitter and storing incoming data through a dedicated callback. This setup ensures efficient, reliable, and direct communication between devices without relying on a traditional Wi-Fi network.---
+# CONCLUSION
 
-<p><b><strong style="white-space: pre-wrap;">Don’t miss out!</strong></b><br><span style="white-space: pre-wrap;">Subscribe to our mailing list and be the first to get updates, tutorials, and insights delivered straight to your inbox. Stay ahead with the latest posts and projects—join our community today! 🚀</span></p>
+In conclusion, establishing ESP-NOW communication between two ESP32 devices requires a consistent and well-structured approach. Both the transmitter and receiver must share identical data structures and initialization routines, including the setup of NVS and Wi-Fi in station mode. On the transmitter side, FreeRTOS tasks manage data preparation and transmission, while callback functions monitor success and handle errors. The receiver, in contrast, focuses on registering the transmitter and storing incoming data through a dedicated callback. This setup ensures efficient, reliable, and direct communication between devices without relying on a traditional Wi-Fi network.
 
 ---
+
 
 
 
