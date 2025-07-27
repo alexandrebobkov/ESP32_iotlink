@@ -8,13 +8,17 @@ title: "IoT Link | Wireless communication for embedded devices powered by bitBoa
 
 <i>Controlling embedded devices wirelessly using ESP32-C3 WROOM</i>
 
-This post presents a practical introduction to implementing ESP-NOW communication between two ESP32 microcontrollers, one configured as a transmitter and the other as a receiver. The transmitter collects control data—such as joystick positions and motor PWM values—and sends it using a structured format and FreeRTOS tasks to manage concurrent operations. The sendData() function handles data preparation and transmission, while a callback monitors delivery status and manages errors.
+This repository presents a practical introduction to implementing ESP-NOW communication between two ESP32 microcontrollers, one configured as a transmitter and the other as a receiver. The transmitter collects control data—such as joystick positions and motor PWM values—and sends it using a structured format and FreeRTOS tasks to manage concurrent operations. The sendData() function handles data preparation and transmission, while a callback monitors delivery status and manages errors.
 On the receiver side, the focus is on registering the transmitter’s MAC address and using the onDataReceived() callback to process incoming data. The post emphasizes the importance of consistent configuration between devices, including shared data structures, Wi-Fi channel settings, and peer registration. This ensures reliable, low-latency communication without the need for a traditional Wi-Fi network, making ESP-NOW a suitable protocol for remote control applications using ESP32.
-COMMON CODE BLOCKS FIRST
+
+# COMMON CODE BLOCKS FIRST
+
 ESP-NOW is a wireless protocol that allows devices to exchange data directly without needing a Wi-Fi network. For this to work reliably, both devices must be programmed in a similar fashion.
 For example, the code defining and handling the data must be consistent to ensure proper data transmission and reception. This means that the data structs sent between devices must be identical, as well as the initialization of ESP-NOW protocol.
 Defining Data Struct
-The following struct defines the format and organization of the data being transmitted from the sender to the receiver in an ESP-NOW communication setup. Each field represents a specific sensor reading or control signal that the receiving device will interpret and act upon accordingly.``` code
+The following struct defines the format and organization of the data being transmitted from the sender to the receiver in an ESP-NOW communication setup. Each field represents a specific sensor reading or control signal that the receiving device will interpret and act upon accordingly.
+
+``` C
 typedef struct {
     uint16_t    crc;                // CRC16 value of ESPNOW data
     int         x_axis;             // Joystick x-position
@@ -28,10 +32,12 @@ typedef struct {
 } __attribute__((packed)) sensors_data_t;
 ```
 
+## Getting ESP-NOW Ready
 
-Getting ESP-NOW Ready
 The part of code responsible for initializing ESP-NOW is the same both the systems. The app_main() in both transmitter and receiver devices must begin by initializing the Non-Volatile Storage (NVS) required for Wi-Fi and ESP-NOW operations. After that, calling wifi_init() sets the devices to Wi-Fi station mode necessary for ESP-NOW communication.
-This function is essential for both transmitter and receiver devices, as ESP-NOW must be initialized before sending or receiving any data.``` code C
+This function is essential for both transmitter and receiver devices, as ESP-NOW must be initialized before sending or receiving any data.
+
+``` C
 void app_main(void)
 {
     // Initialize NVS
